@@ -1,0 +1,51 @@
+name: Sincronizar fork
+
+on:
+  schedule:
+    # Executa a cada hora, no minuto 17.
+    - cron: "17 * * * *"
+
+  # Permite executar manualmente pela aba Actions.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-fork-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Atualizar main com o original
+    if: github.repository == 'sasantos/ps5-y2jb-autoloader'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Baixar seu fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configurar autor dos commits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Buscar atualizações do original
+        run: |
+          git remote add upstream https://github.com/itsPLK/ps5-y2jb-autoloader.git
+          git fetch --no-tags upstream main
+
+      - name: Mesclar atualizações
+        run: |
+          if ! git merge --no-edit upstream/main; then
+            git merge --abort || true
+            echo "::error::Conflito ao sincronizar. Resolva manualmente as diferenças entre seu fork e o original."
+            exit 1
+          fi
+
+      - name: Salvar atualizações no fork
+        run: git push origin HEAD:main
